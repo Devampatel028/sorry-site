@@ -12,6 +12,4 @@ sorry-nanu
 │   └── ...
 │
 ├── bg-image.png
-└── reel-image.pnggit add .
-git commit -m "Add GitHub Pages deployment workflow"
-git push
+└── reel-image.png
