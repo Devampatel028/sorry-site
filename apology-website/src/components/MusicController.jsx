@@ -54,18 +54,46 @@ export default function MusicController() {
 
     audioRefs.current = { phirKabhi: pk, tuChahiye: tc };
 
-    // Attempt autoplay for the first section (Hero)
-    pk.play()
-      .then(() => {
-        setIsPlaying(true);
-        stateRefs.current.phirKabhi.wasPlaying = true;
-      })
-      .catch(() => {
-        // Autoplay blocked by browser, wait for user manual play
-        setIsPlaying(false);
-      });
+    // 2. Autoplay logic with interaction fallback
+    let autoplayAttempted = false;
 
-    // 2. Setup IntersectionObserver to track the active section
+    const handleFirstInteraction = () => {
+      if (autoplayAttempted) return;
+      const current = currentTrackRef.current;
+      const audio = audioRefs.current[current];
+      
+      // If user manually paused via button before first interaction, respect it
+      if (stateRefs.current[current].userPaused) return;
+
+      audio.play().then(() => {
+        setIsPlaying(true);
+        stateRefs.current[current].wasPlaying = true;
+      }).catch(console.error);
+      
+      cleanupInteractions();
+    };
+
+    const cleanupInteractions = () => {
+      autoplayAttempted = true;
+      ['click', 'touchstart', 'keydown'].forEach(e => {
+        document.removeEventListener(e, handleFirstInteraction);
+      });
+    };
+
+    // Try immediately
+    pk.play().then(() => {
+      setIsPlaying(true);
+      stateRefs.current.phirKabhi.wasPlaying = true;
+      cleanupInteractions();
+    }).catch(() => {
+      // Failed. Wait for interaction.
+      setIsPlaying(false);
+      ['click', 'touchstart', 'keydown'].forEach(e => {
+        document.addEventListener(e, handleFirstInteraction);
+      });
+    });
+
+    // 3. Setup IntersectionObserver to track the active section
     const observer = new IntersectionObserver((entries) => {
       const intersecting = entries.filter(e => e.isIntersecting);
       
@@ -102,26 +130,29 @@ export default function MusicController() {
       currentTrackRef.current = newTrack;
       setActiveTrack(newTrack);
 
-      const newState = stateRefs.current[newTrack];
-      
-      // Play the new track IF:
-      // - The user hasn't manually paused it previously
-      // - AND (it was playing previously OR the track we just switched from was playing)
-      if (!newState.userPaused && (wasPrevPlaying || newState.wasPlaying)) {
+      if (newTrack === 'tuChahiye') {
+        // RULE: ALWAYS play Tu Chahiye when entering Tu Chahiye group
+        stateRefs.current.tuChahiye.userPaused = false;
         newAudio.play()
           .then(() => {
             setIsPlaying(true);
-            if (newTrack === 'tuChahiye') {
-              showToast("Stop the music and see this... ♡");
-            }
+            showToast("Stop the music and see this... ♡");
           })
           .catch(() => setIsPlaying(false));
       } else {
-        setIsPlaying(false);
+        // RULE: Returning to Phir Kabhi
+        // Only play if it wasn't manually paused
+        if (!stateRefs.current.phirKabhi.userPaused) {
+          newAudio.play()
+            .then(() => setIsPlaying(true))
+            .catch(() => setIsPlaying(false));
+        } else {
+          setIsPlaying(false);
+        }
       }
     };
 
-    // 3. Handle Page Visibility
+    // 4. Handle Page Visibility (pause when tab hidden, resume when visible)
     let wasPlayingBeforeHidden = false;
 
     const handleVisibilityChange = () => {
@@ -146,38 +177,10 @@ export default function MusicController() {
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // 4. Force Autoplay on First User Interaction (if blocked by browser)
-    const handleFirstInteraction = () => {
-      const activeTrack = currentTrackRef.current;
-      const audio = audioRefs.current[activeTrack];
-      const state = stateRefs.current[activeTrack];
-
-      // Only attempt to force play if the user hasn't explicitly paused it
-      if (!state.userPaused && audio.paused) {
-        audio.play().then(() => {
-          setIsPlaying(true);
-          state.wasPlaying = true;
-          document.removeEventListener('click', handleFirstInteraction);
-          document.removeEventListener('touchstart', handleFirstInteraction);
-          document.removeEventListener('keydown', handleFirstInteraction);
-        }).catch(() => {});
-      } else if (!audio.paused) {
-        document.removeEventListener('click', handleFirstInteraction);
-        document.removeEventListener('touchstart', handleFirstInteraction);
-        document.removeEventListener('keydown', handleFirstInteraction);
-      }
-    };
-
-    document.addEventListener('click', handleFirstInteraction);
-    document.addEventListener('touchstart', handleFirstInteraction);
-    document.addEventListener('keydown', handleFirstInteraction);
-
     return () => {
+      cleanupInteractions();
       observer.disconnect();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      document.removeEventListener('click', handleFirstInteraction);
-      document.removeEventListener('touchstart', handleFirstInteraction);
-      document.removeEventListener('keydown', handleFirstInteraction);
       pk.pause();
       tc.pause();
     };
