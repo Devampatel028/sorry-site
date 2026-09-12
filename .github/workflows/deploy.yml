@@ -1,0 +1,17 @@
+sorry-nanu
+│
+├── .github
+│   └── workflows
+│       └── deploy.yml
+│
+├── apology-website
+│   ├── src
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   └── ...
+│
+├── bg-image.png
+└── reel-image.pnggit add .
+git commit -m "Add GitHub Pages deployment workflow"
+git push
