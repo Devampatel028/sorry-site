@@ -146,9 +146,38 @@ export default function MusicController() {
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    // 4. Force Autoplay on First User Interaction (if blocked by browser)
+    const handleFirstInteraction = () => {
+      const activeTrack = currentTrackRef.current;
+      const audio = audioRefs.current[activeTrack];
+      const state = stateRefs.current[activeTrack];
+
+      // Only attempt to force play if the user hasn't explicitly paused it
+      if (!state.userPaused && audio.paused) {
+        audio.play().then(() => {
+          setIsPlaying(true);
+          state.wasPlaying = true;
+          document.removeEventListener('click', handleFirstInteraction);
+          document.removeEventListener('touchstart', handleFirstInteraction);
+          document.removeEventListener('keydown', handleFirstInteraction);
+        }).catch(() => {});
+      } else if (!audio.paused) {
+        document.removeEventListener('click', handleFirstInteraction);
+        document.removeEventListener('touchstart', handleFirstInteraction);
+        document.removeEventListener('keydown', handleFirstInteraction);
+      }
+    };
+
+    document.addEventListener('click', handleFirstInteraction);
+    document.addEventListener('touchstart', handleFirstInteraction);
+    document.addEventListener('keydown', handleFirstInteraction);
+
     return () => {
       observer.disconnect();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('touchstart', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
       pk.pause();
       tc.pause();
     };
