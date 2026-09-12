@@ -14,7 +14,7 @@ export default function ReelArea({ link }) {
     >
       {/* The uploaded reel image as the background of this container */}
       <img
-        src="/reel-image.png"
+        src={`${import.meta.env.BASE_URL}reel-image.png`}
         alt="Reel background"
         className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
       />
